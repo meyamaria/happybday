@@ -1,4 +1,4 @@
-* Birthday Celebration *
+**Birthday Celebration**
 
 ## Features
 Firework Display 
