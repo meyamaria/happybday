@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Firework Display</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: black; }
+    canvas { display: block; }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Replace with your Pixabay sound URL -->
+  <audio id="boomSound" preload="auto">
+  <source src="fireworks-sound-280715.mp3" type="audio/mpeg">
+</audio>
+
+
+  <canvas id="fireworks"></canvas>
+  <script>
+    let scene = 0; // 0 = black screen, 1 = fireworks, 2 = balloons, 3 = cake
+    let sceneStart = Date.now();
+
+    const canvas = document.getElementById('fireworks');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const boomSound = document.getElementById('boomSound');
+
+    // Create a simple beep sound programmatically as fallback
+    function playBoomSound() {
+      try {
+        if (boomSound && boomSound.readyState >= 2) {
+          boomSound.volume = 0.7  // volume
+          boomSound.play().catch(error => {
+            console.log("Audio play failed:", error);            
+          });
+        } 
+        
+      } catch (e) {
+        console.log("error playing sound:", e);
+      }
+    }
+
+    // Stop boom sound
+    function stopBoomSound() {
+      try {
+        if (boomSound) {
+          boomSound.pause();
+          boomSound.currentTime = 0;
+        }
+      } catch (e) {
+        console.log("Stop audio error:", e);
+      }
+    }
+
+    // Function to create smoke particles
+    function createSmoke(x, y) {
+      for (let i = 0; i < 20; i++) {
+        smokeParticles.push({
+          x: x + (Math.random() - 0.5) * 10,
+          y: y,
+          dx: (Math.random() - 0.5) * 0.5,
+          dy: -Math.random() * 1 - 0.5,
+          radius: Math.random() * 3 + 2,
+          alpha: 0.6,
+          decay: Math.random() * 0.005 + 0.005,
+          life: Math.random() * 60 + 40
+        });
+      }
+    }
+
+    let rockets = [];
+    let cakeSceneStart = 0; // Track when cake scene starts
+    let candleBlownOut = false;
+    let smokeParticles = [];
+
+    function launchRocket() {
+      rockets.push({
+        x: Math.random() * canvas.width,
+        y: canvas.height,
+        targetY: Math.random() * (canvas.height / 2),
+        speed: Math.random() * 3 + 3,
+        exploded: false,
+        hue: Math.random() * 360,
+        trail: []
+      });
+    }
+
+    let particles = [];
+
+    function createExplosion(x, y, hue) {
+      for (let i = 0; i < 150; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 2 + 1;
+        particles.push({
+          x, y,
+          radius: Math.random() * 1 + 1,
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed,
+          alpha: 1,
+          decay: Math.random() * 0.015 + 0.01,
+          colorHue: hue + Math.random() * 60 - 30 // color variation
+        });
+      }
+    }
+
+    function Letter(char, x, y) {
+      this.char = char;
+      this.x = x;
+      this.targetY = y;
+      this.animationDelay = Math.random() * 1500; // Random delay for each letter
+      this.animationStarted = false;
+      
+      var hue = (x / canvas.width) * 360;
+      this.color = `hsl(${hue}, 80%, 60%)`;
+    }
+
+    const opts = {
+      charSize: 48
+    };
+
+    const message = "HAPPY BIRTHDAY!";
+    let letters = [];
+
+    const baseY = canvas.height / 2;
+    const spacing = canvas.width / (message.length + 2);
+    let startX = spacing;
+
+    for (let i = 0; i < message.length; i++) {
+      const char = message[i];
+      const x = startX + i * spacing;
+      const y = baseY;
+      letters.push(new Letter(char, x, y));
+    }
+
+    function animate() {
+      const timeInScene = Date.now() - sceneStart;
+
+      // Scene transitions
+      if (scene === 0 && timeInScene > 1000) {
+        scene = 1;
+        sceneStart = Date.now();
+        playBoomSound(); // Start fireworks sound
+      }
+
+      if (scene === 1 && timeInScene > 6000) {
+        scene = 2;
+        sceneStart = Date.now();
+      }
+
+      if (scene === 2 && timeInScene > 8000) {
+        scene = 3;
+        sceneStart = Date.now();
+        cakeSceneStart = Date.now();
+        stopBoomSound(); // Stop fireworks sound
+      }
+
+      // Clear canvas with fade effect
+      if (scene === 2) {
+        // For birthday message scene, clear completely to show balloons clearly
+        ctx.fillStyle = 'rgba(0,0,0,0.9)';
+      } else {
+        ctx.fillStyle = scene === 0 ? 'black' : 'rgba(0,0,0,0.1)';
+      }
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Scene 1 & 2: Fireworks (but reduce intensity in scene 2)
+      if (scene >= 1 && scene <= 2) {
+        // Rocket animation
+        for (let i = rockets.length - 1; i >= 0; i--) {
+          const r = rockets[i];
+          
+          // Draw rocket
+          ctx.beginPath();
+          ctx.arc(r.x, r.y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = `hsl(${r.hue}, 100%, 70%)`;
+          ctx.fill();
+          
+          // Move rocket
+          r.y -= r.speed;
+          
+          // Add to trail
+          r.trail.push({ x: r.x, y: r.y, hue: r.hue });
+          if (r.trail.length > 15) r.trail.shift();
+
+          // Draw trail
+          for (let j = 0; j < r.trail.length; j++) {
+            const alpha = (j / r.trail.length) * 0.6;
+            ctx.beginPath();
+            ctx.arc(r.trail[j].x, r.trail[j].y, 2, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${r.hue}, 100%, 60%, ${alpha})`;
+            ctx.fill();
+          }
+
+          // Check for explosion
+          if (r.y <= r.targetY && !r.exploded) {
+            createExplosion(r.x, r.y, r.hue);
+            r.exploded = true;
+            rockets.splice(i, 1);
+          }
+        }
+
+        // Particle animation
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.dx;
+          p.y += p.dy;
+          p.dy += 0.03; // gravity
+          p.dx *= 0.998; // air resistance
+          p.alpha -= p.decay;
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${p.colorHue}, 100%, 60%, ${p.alpha})`;
+          ctx.fill();
+
+          if (p.alpha <= 0) {
+            particles.splice(i, 1);
+          }
+        }
+      }
+
+      // Scene 2: Birthday message popping up with fireworks
+      if (scene === 2) {
+        ctx.font = `${opts.charSize}px 'Gloria Hallelujah', cursive`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        for (let i = 0; i < letters.length; i++) {
+          const letter = letters[i];
+          const sceneTime = timeInScene;
+          
+          // Start animation after delay
+          if (sceneTime > letter.animationDelay && !letter.animationStarted) {
+            letter.animationStarted = true;
+            // Create explosion when letter appears
+            createExplosion(letter.x, letter.targetY, letter.color.match(/\d+/)[0]);
+          }
+          
+          if (letter.animationStarted) {
+            // Pop-in animation with bounce
+            const animationTime = sceneTime - letter.animationDelay;
+            let scale = 1;
+            
+            if (animationTime < 500) {
+              // Bouncy pop-in effect
+              const progress = animationTime / 500;
+              scale = 0.3 + (1.2 * Math.sin(progress * Math.PI)) + (0.5 * progress);
+              if (scale > 1.3) scale = 1.3;
+            } else if (animationTime < 800) {
+              // Settle to normal size
+              const settleProgress = (animationTime - 500) / 300;
+              scale = 1.3 - (0.3 * settleProgress);
+            } else {
+              // Gentle pulsing
+              scale = 1 + Math.sin(animationTime / 300) * 0.05;
+            }
+
+            // Save context for scaling
+            ctx.save();
+            ctx.translate(letter.x, letter.targetY);
+            ctx.scale(scale, scale);
+
+            // // Glowing effect
+            // ctx.shadowColor = letter.color;
+            // ctx.shadowBlur = 15;
+            // ctx.shadowOffsetX = 0;
+            // ctx.shadowOffsetY = 0;
+            
+            // Draw letter with glow
+            ctx.fillStyle = letter.color;
+            ctx.fillText(letter.char, 0, 0);
+            
+            // Draw bright outline
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 3;
+            ctx.strokeText(letter.char, 0, 0);
+            
+            // Reset context
+            ctx.restore();
+            
+            // Reset shadow
+            ctx.shadowColor = "transparent";
+            ctx.shadowBlur = 0;
+          }
+        }
+      }
+
+      // Scene 3: Birthday cake
+      if (scene === 3) {
+        const cakeX = canvas.width / 2;
+        const cakeY = canvas.height - 120;
+        
+        // Draw cake tiers
+        const tiers = [
+          { width: 180, height: 40, color: "#8B4513" },
+          { width: 130, height: 35, color: "#DEB887" },
+          { width: 90, height: 30, color: "#FFB6C1" }
+        ];
+
+        // Draw cake tiers
+        let currentY = cakeY;
+        let tierTops = [];
+        for (let i = 0; i < tiers.length; i++) {
+          const tier = tiers[i];
+          currentY -= tier.height;
+
+          // Save top Y for icing
+          tierTops.push({ y: currentY, width: tier.width });
+
+          // Draw tier
+          ctx.fillStyle = tier.color;
+          ctx.fillRect(cakeX - tier.width / 2, currentY, tier.width, tier.height);
+        }
+        // Draw icing on top of each tier
+        for (let i = 0; i < tierTops.length; i++) {
+          const { y, width } = tierTops[i];
+          ctx.beginPath();
+          ctx.moveTo(cakeX - width / 2, y);
+          for (let x = 0; x <= width; x += 20) {
+            const waveY = 5 * Math.sin((x + Date.now() / 800 + x / 23)); // wave effect
+            ctx.lineTo(cakeX - width / 2 + x, y + waveY);
+          }
+          ctx.lineTo(cakeX + width / 2, y); // right corner
+          ctx.lineTo(cakeX + width / 2, y - 12); // close icing back
+          ctx.lineTo(cakeX - width / 2, y - 12);
+          ctx.closePath();
+          ctx.fillStyle = "white";
+          ctx.fill();
+        }
+
+        // Draw candle
+        const candleHeight = 60;
+        ctx.fillStyle = "#FFFACD";
+        ctx.fillRect(cakeX - 4, currentY - candleHeight, 8, candleHeight);
+        
+        // Draw flame
+        // Candle flame logic
+        const baseFlameY = currentY - candleHeight - 15;
+        let flameX = cakeX;
+        let flameY = baseFlameY;
+        let flameSize = 8;
+        const timeSinceCakeStart = Date.now() - cakeSceneStart;
+
+        // Check if 5 seconds have passed since "Make a wish!" appeared
+        if (timeSinceCakeStart > 5000 && !candleBlownOut) {
+          if (timeSinceCakeStart < 6000) {
+            // Violent flickering for 1 second
+            flameX += (Math.random() - 0.5) * 8;
+            flameY += (Math.random() - 0.5) * 6;
+            flameSize += (Math.random() - 0.5) * 6;
+          } else {
+            // Blow out the candle
+            candleBlownOut = true;
+            createSmoke(cakeX, baseFlameY);
+          }
+        }
+        
+        // Draw flame if not blown out
+        if (!candleBlownOut) {
+          if (timeSinceCakeStart <= 5000) {
+            // Normal flame animation
+            flameSize += Math.sin(Date.now() / 100) * 2;
+            flameY += Math.sin(Date.now() / 80) * 3;
+          }
+        
+
+        // Flame glow
+        const gradient = ctx.createRadialGradient(cakeX, flameY, 0, cakeX, flameY, 20);
+        gradient.addColorStop(0, "rgba(255,255,0,0.8)");
+        gradient.addColorStop(0.5, "rgba(255,100,0,0.4)");
+        gradient.addColorStop(1, "rgba(255,0,0,0.1)");
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(cakeX, flameY, 20, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Flame
+        ctx.beginPath();
+        ctx.arc(cakeX, flameY, flameSize, 0, Math.PI * 2);
+        ctx.fillStyle = "yellow";
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.arc(cakeX, flameY + 2, flameSize * 0.6, 0, Math.PI * 2);
+        ctx.fillStyle = "orange";
+        ctx.fill();
+      }
+
+      // Draw and animate smoke particles
+        for (let i = smokeParticles.length - 1; i >= 0; i--) {
+          const smoke = smokeParticles[i];
+          smoke.x += smoke.dx;
+          smoke.y += smoke.dy;
+          smoke.dx += (Math.random() - 0.5) * 0.1; // Add some randomness
+          smoke.radius += 0.05; // Smoke expands
+          smoke.alpha -= smoke.decay;
+          smoke.life--;
+
+          // Draw smoke
+          ctx.beginPath();
+          ctx.arc(smoke.x, smoke.y, smoke.radius, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(128, 128, 128, ${smoke.alpha})`;
+          ctx.fill();
+
+          // Remove old smoke particles
+          if (smoke.alpha <= 0 || smoke.life <= 0) {
+            smokeParticles.splice(i, 1);
+          }
+        }
+
+        // Continue generating smoke for a while after blowing out
+        if (candleBlownOut && timeSinceCakeStart < 8000) {
+          if (Math.random() < 0.3) {
+            createSmoke(cakeX, baseFlameY);
+          }
+        }
+
+        // Draw message
+        ctx.font = "42px 'Gloria Hallelujah', cursive";
+        ctx.fillStyle = "white";
+        ctx.textAlign = "center";
+        ctx.strokeStyle = "rgba(0,0,0,0.5)";
+        ctx.lineWidth = 3;
+        let message = "Make a wish!";
+        if (candleBlownOut) {
+          message = "Happy Birthday! 🎉";
+        }
+        
+        ctx.strokeText(message, canvas.width / 2, currentY - 120);
+        ctx.fillText(message, canvas.width / 2, currentY - 120);
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // Launch rockets periodically during fireworks scenes
+    setInterval(() => {
+      if (scene === 1) {
+        launchRocket();
+      } else if (scene === 2 && Math.random() < 0.3) {
+        // Fewer rockets during birthday message
+        launchRocket();
+      }
+    }, 800);
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    });
+
+    // Click to create fireworks
+    canvas.addEventListener('click', (e) => {
+      if (scene >= 1) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        createExplosion(x, y, Math.random() * 360);
+      }
+    });
+
+    // Start animation
+    animate();
+  </script>
+</body>
+</html>
