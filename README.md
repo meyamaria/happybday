@@ -19,8 +19,10 @@ Responsive Design
 ## File Structure
 
 project/
+
 ->pic.html           # Main HTML file with embedded script
-=>fireworks-sound.mp3  # Firework sound effect (you can replace this).
+
+->fireworks-sound.mp3  # Firework sound effect (you can replace this).
 
 ## Technologies
 * HTML5 Canvas for graphics
