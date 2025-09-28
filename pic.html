@@ -14,7 +14,6 @@
   <source src="fireworks-sound-280715.mp3" type="audio/mpeg">
 </audio>
 
-
   <canvas id="fireworks"></canvas>
   <script>
     let scene = 0; // 0 = black screen, 1 = fireworks, 2 = balloons, 3 = cake
@@ -75,6 +74,12 @@
     let candleBlownOut = false;
     let smokeParticles = [];
 
+    // Candle flame flickering variables
+    let flameOffset = { x: 0, y: 0 };
+    let flameSizeMultiplier = 1;
+    let flameIntensity = 1;
+    let windStrength = 0;
+
     function launchRocket() {
       rockets.push({
         x: Math.random() * canvas.width,
@@ -109,7 +114,7 @@
       this.char = char;
       this.x = x;
       this.targetY = y;
-      this.animationDelay = Math.random() * 1500; // Random delay for each letter
+      this.animationDelay = Math.random() * 1000; // Random delay for each letter
       this.animationStarted = false;
       
       var hue = (x / canvas.width) * 360;
@@ -134,6 +139,51 @@
       letters.push(new Letter(char, x, y));
     }
 
+    // Enhanced candle flickering function
+    function updateFlameFlicker(time, isAboutToBlow = false) {
+      if (isAboutToBlow) {
+        // Dramatic flickering before blowing out
+        flameOffset.x = (Math.random() - 0.5) * 12;
+        flameOffset.y = (Math.random() - 0.5) * 8;
+        flameSizeMultiplier = 0.5 + Math.random() * 0.8;
+        flameIntensity = 0.3 + Math.random() * 0.7;
+        windStrength = Math.random() * 3;
+      } else {
+        // Natural flickering using multiple sine waves for realistic movement
+        const baseFreq = time / 150;
+        const microFlicker = time / 50;
+        const gentleWave = time / 300;
+        
+        // Horizontal movement (gentle swaying)
+        flameOffset.x = Math.sin(gentleWave) * 2 + 
+                      Math.sin(baseFreq * 2.3) * 1.2 + 
+                      Math.sin(microFlicker * 5.7) * 0.5;
+        
+        // Vertical movement (dancing up and down)
+        flameOffset.y = Math.sin(baseFreq * 1.7) * 1.8 + 
+                       Math.sin(microFlicker * 4.1) * 0.8 + 
+                       Math.sin(gentleWave * 0.8) * 1;
+        
+        // Size variation (breathing effect)
+        flameSizeMultiplier = 1 + 
+                             Math.sin(baseFreq * 1.5) * 0.15 + 
+                             Math.sin(microFlicker * 3.2) * 0.08 + 
+                             Math.sin(gentleWave * 1.1) * 0.1;
+        
+        // Intensity variation (brightness flickering)
+        flameIntensity = 0.85 + 
+                        Math.sin(baseFreq * 2.1) * 0.1 + 
+                        Math.sin(microFlicker * 6.3) * 0.05;
+        
+        // Occasional wind gusts
+        if (Math.random() < 0.002) {
+          windStrength = Math.random() * 2;
+        }
+        windStrength *= 0.95; // Wind dies down
+        flameOffset.x += windStrength;
+      }
+    }
+
     function animate() {
       const timeInScene = Date.now() - sceneStart;
 
@@ -144,7 +194,7 @@
         playBoomSound(); // Start fireworks sound
       }
 
-      if (scene === 1 && timeInScene > 6000) {
+      if (scene === 1 && timeInScene > 4000) {
         scene = 2;
         sceneStart = Date.now();
       }
@@ -262,12 +312,6 @@
             ctx.translate(letter.x, letter.targetY);
             ctx.scale(scale, scale);
 
-            // // Glowing effect
-            // ctx.shadowColor = letter.color;
-            // ctx.shadowBlur = 15;
-            // ctx.shadowOffsetX = 0;
-            // ctx.shadowOffsetY = 0;
-            
             // Draw letter with glow
             ctx.fillStyle = letter.color;
             ctx.fillText(letter.char, 0, 0);
@@ -313,6 +357,7 @@
           ctx.fillStyle = tier.color;
           ctx.fillRect(cakeX - tier.width / 2, currentY, tier.width, tier.height);
         }
+        
         // Draw icing on top of each tier
         for (let i = 0; i < tierTops.length; i++) {
           const { y, width } = tierTops[i];
@@ -335,60 +380,74 @@
         ctx.fillStyle = "#FFFACD";
         ctx.fillRect(cakeX - 4, currentY - candleHeight, 8, candleHeight);
         
-        // Draw flame
-        // Candle flame logic
+        // Enhanced candle flame with realistic flickering
         const baseFlameY = currentY - candleHeight - 15;
-        let flameX = cakeX;
-        let flameY = baseFlameY;
-        let flameSize = 8;
         const timeSinceCakeStart = Date.now() - cakeSceneStart;
+        const currentTime = Date.now();
 
-        // Check if 5 seconds have passed since "Make a wish!" appeared
-        if (timeSinceCakeStart > 5000 && !candleBlownOut) {
-          if (timeSinceCakeStart < 6000) {
-            // Violent flickering for 1 second
-            flameX += (Math.random() - 0.5) * 8;
-            flameY += (Math.random() - 0.5) * 6;
-            flameSize += (Math.random() - 0.5) * 6;
+        // Check if 5 seconds have passed and determine flame state
+        let isAboutToBlow = false;
+        if (timeSinceCakeStart > 2000 && !candleBlownOut) {
+          if (timeSinceCakeStart < 3500) {
+            // Violent flickering for 2 seconds before blowing out
+            isAboutToBlow = true;
           } else {
             // Blow out the candle
             candleBlownOut = true;
             createSmoke(cakeX, baseFlameY);
           }
         }
-        
-        // Draw flame if not blown out
+
+        // Update flame flickering
         if (!candleBlownOut) {
-          if (timeSinceCakeStart <= 5000) {
-            // Normal flame animation
-            flameSize += Math.sin(Date.now() / 100) * 2;
-            flameY += Math.sin(Date.now() / 80) * 3;
-          }
-        
+          updateFlameFlicker(currentTime, isAboutToBlow);
 
-        // Flame glow
-        const gradient = ctx.createRadialGradient(cakeX, flameY, 0, cakeX, flameY, 20);
-        gradient.addColorStop(0, "rgba(255,255,0,0.8)");
-        gradient.addColorStop(0.5, "rgba(255,100,0,0.4)");
-        gradient.addColorStop(1, "rgba(255,0,0,0.1)");
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(cakeX, flameY, 20, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Flame
-        ctx.beginPath();
-        ctx.arc(cakeX, flameY, flameSize, 0, Math.PI * 2);
-        ctx.fillStyle = "yellow";
-        ctx.fill();
-        
-        ctx.beginPath();
-        ctx.arc(cakeX, flameY + 2, flameSize * 0.6, 0, Math.PI * 2);
-        ctx.fillStyle = "orange";
-        ctx.fill();
-      }
+          // Calculate final flame position
+          let flameX = cakeX + flameOffset.x;
+          let flameY = baseFlameY + flameOffset.y;
+          let flameSize = 8 * flameSizeMultiplier;
 
-      // Draw and animate smoke particles
+          // Enhanced flame glow with flickering intensity
+          const glowRadius = 25 * flameSizeMultiplier;
+          const gradient = ctx.createRadialGradient(flameX, flameY, 0, flameX, flameY, glowRadius);
+          const glowAlpha = 0.6 * flameIntensity;
+          gradient.addColorStop(0, `rgba(255,255,100,${glowAlpha})`);
+          gradient.addColorStop(0.3, `rgba(255,150,0,${glowAlpha * 0.7})`);
+          gradient.addColorStop(0.7, `rgba(255,50,0,${glowAlpha * 0.4})`);
+          gradient.addColorStop(1, `rgba(255,0,0,${glowAlpha * 0.1})`);
+          
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(flameX, flameY, glowRadius, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Draw main flame with multiple layers for realism
+          // Outer flame (red-orange)
+          ctx.beginPath();
+          ctx.ellipse(flameX, flameY + 2, flameSize * 0.8, flameSize * 1.2, 0, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 69, 0, ${0.8 * flameIntensity})`;
+          ctx.fill();
+          
+          // Middle flame (orange)
+          ctx.beginPath();
+          ctx.ellipse(flameX, flameY, flameSize * 0.65, flameSize, 0, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 140, 0, ${0.9 * flameIntensity})`;
+          ctx.fill();
+          
+          // Inner flame (yellow-white)
+          ctx.beginPath();
+          ctx.ellipse(flameX, flameY - 1, flameSize * 0.4, flameSize * 0.7, 0, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 255, 100, ${flameIntensity})`;
+          ctx.fill();
+          
+          // Core flame (bright white-yellow)
+          ctx.beginPath();
+          ctx.ellipse(flameX, flameY - 2, flameSize * 0.2, flameSize * 0.4, 0, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 255, 200, ${flameIntensity})`;
+          ctx.fill();
+        }
+
+        // Draw and animate smoke particles
         for (let i = smokeParticles.length - 1; i >= 0; i--) {
           const smoke = smokeParticles[i];
           smoke.x += smoke.dx;
@@ -411,7 +470,7 @@
         }
 
         // Continue generating smoke for a while after blowing out
-        if (candleBlownOut && timeSinceCakeStart < 8000) {
+        if (candleBlownOut && timeSinceCakeStart < 4000) {
           if (Math.random() < 0.3) {
             createSmoke(cakeX, baseFlameY);
           }
